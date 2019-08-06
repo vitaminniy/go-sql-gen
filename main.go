@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -12,7 +11,8 @@ import (
 	"text/template"
 )
 
-const tmpl = `package {{.PackageName}}
+const suffix = "sql_scan"
+const tmpl = `package {{.Package}}
 
 import (
 	"context"
@@ -24,7 +24,7 @@ import (
 {{range .Structs}}
 // Get{{.Name}}Context returns element of type {{.Name}}.
 //
-// Get{{.Name}}Context expects the following query fields order:
+// The following fields order in result-set expected:
 // {{range $i, $s := .Fields}}{{if gt $i 0}},{{end}}{{$s}}{{end}}
 func Get{{.Name}}Context(ctx context.Context, db *sql.DB, query string, args ...interface{}) (result {{.Name}}, err error) {
 	err = db.QueryRowContext(ctx, query, args).Scan({{range $i, $s := .Fields}}{{if gt $i 0}}, {{end}}&result.{{$s}}{{end}})
@@ -33,7 +33,7 @@ func Get{{.Name}}Context(ctx context.Context, db *sql.DB, query string, args ...
 
 // Get{{.Name}}ListContext returns slice of elements of type {{.Name}}.
 //
-// Get{{.Name}}ListContext expects the following query fields order:
+// The following fields order in result-set expected:
 // {{range $i, $s := .Fields}}{{if gt $i 0}},{{end}}{{$s}}{{end}}
 func Get{{.Name}}ListContext(ctx context.Context, db *sql.DB, query string, args ...interface{}) (result []{{.Name}}, err error) {
 	rows, err := db.QueryContext(ctx, query, args)
@@ -61,11 +61,7 @@ func main() {
 	log.SetFlags(0)
 	log.SetPrefix("go-sql-scan: ")
 
-	fileSuffix := flag.String("suffix", "prefix", "generated file suffix;")
-
 	flag.Parse()
-
-	*fileSuffix = fmt.Sprintf("_%s.go", *fileSuffix)
 
 	args := flag.NArg()
 	if args == 0 {
@@ -75,14 +71,36 @@ func main() {
 	for i := 0; i < args; i++ {
 		fn := flag.Arg(i)
 
-		if !strings.HasSuffix(fn, ".go") || strings.HasSuffix(fn, *fileSuffix) {
+		if !strings.HasSuffix(fn, ".go") || strings.HasSuffix(fn, suffix+".go") {
 			continue
 		}
 
-		if err := processFile(fn, *fileSuffix); err != nil {
-			log.Printf("couldn't process file %s: %v\n", fn, err)
+		pf, err := parseFile(fn)
+		if err != nil {
+			log.Printf("couldn't parse file %s: %v\n", fn, err)
+			continue
+		}
+
+		newFn := strings.Replace(fn, ".go", "_"+suffix+".go", 1)
+		file, err := os.Create(newFn)
+		if err != nil {
+			log.Printf("couldn't create %s: %v\n", newFn, err)
+			continue
+		}
+
+		if err := templater.Execute(file, pf); err != nil {
+			log.Printf("couldn't execute template on file %s: %v\n", fn, err)
+		}
+
+		if err := file.Close(); err != nil {
+			log.Printf("couldn't finalize %s: %v\n", newFn, err)
 		}
 	}
+}
+
+type parsedFile struct {
+	Package string
+	Structs []parsedStruct
 }
 
 type parsedStruct struct {
@@ -90,19 +108,16 @@ type parsedStruct struct {
 	Fields []string
 }
 
-func processFile(fname, suffix string) error {
-	fs := token.NewFileSet()
-	pf, err := parser.ParseFile(fs, fname, nil, parser.ParseComments)
+func parseFile(file string) (pf parsedFile, err error) {
+	f, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ParseComments)
 	if err != nil {
-		return err
+		return pf, err
 	}
 
-	packageName := ""
-	structs := make([]parsedStruct, 0)
-	ast.Inspect(pf, func(n ast.Node) bool {
+	ast.Inspect(f, func(n ast.Node) bool {
 		p, ok := n.(*ast.File)
 		if ok {
-			packageName = p.Name.Name
+			pf.Package = p.Name.Name
 			return true
 		}
 
@@ -120,19 +135,14 @@ func processFile(fname, suffix string) error {
 			return true
 		}
 
-		fields := make([]string, 0, st.Fields.NumFields())
-		for i := 0; i < st.Fields.NumFields(); i++ {
-			fieldName := ""
-			if len(st.Fields.List[i].Names) != 0 {
-				fieldName = st.Fields.List[i].Names[0].Name
-			}
-
-			if fieldName != "" {
-				fields = append(fields, fieldName)
+		fields := make([]string, 0)
+		for i := range st.Fields.List {
+			for _, name := range st.Fields.List[i].Names {
+				fields = append(fields, name.Name)
 			}
 		}
 
-		structs = append(structs, parsedStruct{
+		pf.Structs = append(pf.Structs, parsedStruct{
 			Name:   t.Name.Name,
 			Fields: fields,
 		})
@@ -140,21 +150,5 @@ func processFile(fname, suffix string) error {
 		return true
 	})
 
-	result, err := os.Create(strings.Replace(fname, ".go", suffix, 1))
-	if err != nil {
-		return err
-	}
-	defer result.Close()
-
-	if err := templater.Execute(result, struct {
-		PackageName string
-		Structs     []parsedStruct
-	}{
-		PackageName: packageName,
-		Structs:     structs,
-	}); err != nil {
-		return err
-	}
-
-	return nil
+	return pf, nil
 }
