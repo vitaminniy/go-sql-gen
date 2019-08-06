@@ -8,7 +8,6 @@ import (
 	"go/token"
 	"log"
 	"os"
-	"path"
 	"strings"
 	"text/template"
 )
@@ -98,8 +97,15 @@ func processFile(fname, suffix string) error {
 		return err
 	}
 
+	packageName := ""
 	structs := make([]parsedStruct, 0)
 	ast.Inspect(pf, func(n ast.Node) bool {
+		p, ok := n.(*ast.File)
+		if ok {
+			packageName = p.Name.Name
+			return true
+		}
+
 		t, ok := n.(*ast.TypeSpec)
 		if !ok {
 			return true
@@ -144,7 +150,7 @@ func processFile(fname, suffix string) error {
 		PackageName string
 		Structs     []parsedStruct
 	}{
-		PackageName: path.Dir(fname),
+		PackageName: packageName,
 		Structs:     structs,
 	}); err != nil {
 		return err
