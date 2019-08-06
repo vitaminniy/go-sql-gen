@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"log"
 	"os"
+	"reflect"
 	"strings"
 	"text/template"
 )
@@ -55,7 +56,10 @@ func Get{{.Name}}ListContext(ctx context.Context, db *sql.DB, query string, args
 {{end}}
 `
 
-var templater = template.Must(template.New("").Parse(tmpl))
+var (
+	templater        = template.Must(template.New("").Parse(tmpl))
+	ignoreUnexported = flag.Bool("i", false, "ignore unexported struct fields")
+)
 
 func main() {
 	log.SetFlags(0)
@@ -138,6 +142,15 @@ func parseFile(file string) (pf parsedFile, err error) {
 		fields := make([]string, 0)
 		for i := range st.Fields.List {
 			for _, name := range st.Fields.List[i].Names {
+				if ok := name.IsExported(); *ignoreUnexported && !ok {
+					continue
+				}
+				if rtag := st.Fields.List[i].Tag; rtag != nil && len(rtag.Value) > 0 {
+					tag := reflect.StructTag(rtag.Value[1:])
+					if tag.Get("go-sql-gen") == "-" {
+						continue
+					}
+				}
 				fields = append(fields, name.Name)
 			}
 		}
