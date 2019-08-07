@@ -1,3 +1,6 @@
+// go-sql-scan is a tool to automate the creation of methods that
+// scan database/sql.Rows into objects and slices of objects.
+
 package main
 
 import (
