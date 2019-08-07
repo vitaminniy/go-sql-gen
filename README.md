@@ -6,6 +6,8 @@ Generates functions for scanning sql.Rows into structs:
 type MyStruct struct {
     A, B, C int
     D       float64
+    E       bool `go-sql-gen:"-"` // this field will be ignored
+    f       string // if flag -i provided, this field would be ignored, because it is private field
 }
 
 // go-sql-gen generates following functions:
