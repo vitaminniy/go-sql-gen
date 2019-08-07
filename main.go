@@ -78,7 +78,7 @@ func main() {
 			continue
 		}
 
-		pf, err := parseFile(fn)
+		pf, err := parseFile(fn, *ignoreUnexported)
 		if err != nil {
 			log.Printf("couldn't parse file %s: %v\n", fn, err)
 			continue
@@ -111,7 +111,7 @@ type parsedStruct struct {
 	Fields []string
 }
 
-func parseFile(file string) (pf parsedFile, err error) {
+func parseFile(file string, ignoreUnexported bool) (pf parsedFile, err error) {
 	f, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ParseComments)
 	if err != nil {
 		return pf, err
@@ -141,7 +141,7 @@ func parseFile(file string) (pf parsedFile, err error) {
 		fields := make([]string, 0)
 		for _, field := range st.Fields.List {
 			for _, name := range field.Names {
-				if ok := name.IsExported(); *ignoreUnexported && !ok {
+				if ok := name.IsExported(); ignoreUnexported && !ok {
 					continue
 				}
 				if rtag := field.Tag; rtag != nil && len(rtag.Value) > 0 {

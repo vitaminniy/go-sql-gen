@@ -1,0 +1,7 @@
+package main
+
+type ParseFile struct {
+	A, b int
+	C    bool
+	D    string
+}
