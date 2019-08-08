@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"reflect"
 	"testing"
 )
@@ -39,7 +40,13 @@ func TestParseFile(t *testing.T) {
 
 	testFn := func(t *testing.T, file string, expected parsedFile, ignoreUnexported bool) func(*testing.T) {
 		return func(t *testing.T) {
-			actual, err := parseFile(file, ignoreUnexported)
+			f, err := os.Open(file)
+			if err != nil {
+				t.Fatalf("couldn't open %s: %v\n", file, err)
+			}
+			defer f.Close()
+
+			actual, err := parseFile(f, ignoreUnexported)
 			if err != nil {
 				t.Fatalf("parseFile failed: %v\n", err)
 			}

@@ -8,6 +8,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io"
 	"log"
 	"os"
 	"reflect"
@@ -81,10 +82,19 @@ func main() {
 			continue
 		}
 
-		pf, err := parseFile(fn, *ignoreUnexported)
+		f, err := os.Open(fn)
+		if err != nil {
+			log.Printf("couldn't open %s: %v\n", fn, err)
+		}
+
+		pf, err := parseFile(f, *ignoreUnexported)
 		if err != nil {
 			log.Printf("couldn't parse file %s: %v\n", fn, err)
 			continue
+		}
+
+		if err := f.Close(); err != nil {
+			log.Printf("couldn't close %s: %v\n", fn, err)
 		}
 
 		newFn := strings.Replace(fn, ".go", "_"+suffix+".go", 1)
@@ -114,8 +124,8 @@ type parsedStruct struct {
 	Fields []string
 }
 
-func parseFile(file string, ignoreUnexported bool) (pf parsedFile, err error) {
-	f, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ParseComments)
+func parseFile(r io.Reader, ignoreUnexported bool) (pf parsedFile, err error) {
+	f, err := parser.ParseFile(token.NewFileSet(), "", r, parser.ParseComments)
 	if err != nil {
 		return pf, err
 	}
