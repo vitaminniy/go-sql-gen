@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
 	"text/template"
 )
@@ -61,6 +62,7 @@ func Get{{.Name}}ListContext(ctx context.Context, db *sql.DB, query string, args
 
 var (
 	templater        = template.Must(template.New("").Parse(tmpl))
+	match            = flag.String("m", ".", "pattern for matching struct names")
 	ignoreUnexported = flag.Bool("i", false, "ignore unexported struct fields")
 )
 
@@ -75,6 +77,8 @@ func main() {
 		log.Fatalln("no files provided")
 	}
 
+	re := regexp.MustCompile(*match)
+
 	for i := 0; i < args; i++ {
 		fn := flag.Arg(i)
 
@@ -87,7 +91,7 @@ func main() {
 			log.Printf("couldn't open %s: %v\n", fn, err)
 		}
 
-		pf, err := parseFile(f, *ignoreUnexported)
+		pf, err := parseFile(f, re, *ignoreUnexported)
 		if err != nil {
 			log.Printf("couldn't parse file %s: %v\n", fn, err)
 			continue
@@ -124,7 +128,7 @@ type parsedStruct struct {
 	Fields []string
 }
 
-func parseFile(r io.Reader, ignoreUnexported bool) (pf parsedFile, err error) {
+func parseFile(r io.Reader, re *regexp.Regexp, ignoreUnexported bool) (pf parsedFile, err error) {
 	f, err := parser.ParseFile(token.NewFileSet(), "", r, parser.ParseComments)
 	if err != nil {
 		return pf, err
@@ -143,6 +147,10 @@ func parseFile(r io.Reader, ignoreUnexported bool) (pf parsedFile, err error) {
 		}
 
 		if t.Type == nil {
+			return true
+		}
+
+		if ok := re.MatchString(t.Name.Name); !ok {
 			return true
 		}
 
