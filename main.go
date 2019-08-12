@@ -33,7 +33,7 @@ import (
 // The following fields order in result-set expected:
 // {{range $i, $s := .Fields}}{{if gt $i 0}},{{end}}{{$s}}{{end}}
 func Get{{.Name}}Context(ctx context.Context, db *sql.DB, query string, args ...interface{}) (result {{.Name}}, err error) {
-	err = db.QueryRowContext(ctx, query, args).Scan({{range $i, $s := .Fields}}{{if gt $i 0}}, {{end}}&result.{{$s}}{{end}})
+	err = db.QueryRowContext(ctx, query, args...).Scan({{range $i, $s := .Fields}}{{if gt $i 0}}, {{end}}&result.{{$s}}{{end}})
 	return result, err
 }
 
@@ -42,7 +42,7 @@ func Get{{.Name}}Context(ctx context.Context, db *sql.DB, query string, args ...
 // The following fields order in result-set expected:
 // {{range $i, $s := .Fields}}{{if gt $i 0}},{{end}}{{$s}}{{end}}
 func Get{{.Name}}ListContext(ctx context.Context, db *sql.DB, query string, args ...interface{}) (result []{{.Name}}, err error) {
-	rows, err := db.QueryContext(ctx, query, args)
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
