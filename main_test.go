@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"reflect"
+	"regexp"
 	"testing"
 )
 
@@ -11,6 +12,7 @@ func TestParseFile(t *testing.T) {
 		file             string
 		expected         parsedFile
 		ignoreUnexported bool
+		re               *regexp.Regexp
 	}{
 		{
 			file: "testdata/parse_file_1",
@@ -18,6 +20,7 @@ func TestParseFile(t *testing.T) {
 				Package: "main",
 				Structs: []parsedStruct{{Name: "ParseFile", Fields: []string{"A", "B", "C", "D"}}},
 			},
+			re:               regexp.MustCompile("."),
 			ignoreUnexported: false,
 		},
 		{
@@ -26,6 +29,7 @@ func TestParseFile(t *testing.T) {
 				Package: "main",
 				Structs: []parsedStruct{{Name: "ParseFile", Fields: []string{"A", "C", "D"}}},
 			},
+			re:               regexp.MustCompile("."),
 			ignoreUnexported: true,
 		},
 		{
@@ -34,11 +38,30 @@ func TestParseFile(t *testing.T) {
 				Package: "main",
 				Structs: []parsedStruct{{Name: "ParseFile", Fields: []string{"A", "D"}}},
 			},
+			re:               regexp.MustCompile("."),
+			ignoreUnexported: true,
+		},
+		{
+			file: "testdata/parse_file_3",
+			expected: parsedFile{
+				Package: "main",
+				Structs: []parsedStruct{{Name: "ParseFile", Fields: []string{"A", "D"}}},
+			},
+			re:               regexp.MustCompile("File"),
+			ignoreUnexported: true,
+		},
+		{
+			file: "testdata/parse_file_3",
+			expected: parsedFile{
+				Package: "main",
+				Structs: []parsedStruct{},
+			},
+			re:               regexp.MustCompile("existedStructName"),
 			ignoreUnexported: true,
 		},
 	}
 
-	testFn := func(t *testing.T, file string, expected parsedFile, ignoreUnexported bool) func(*testing.T) {
+	testFn := func(t *testing.T, file string, expected parsedFile, re *regexp.Regexp, ignoreUnexported bool) func(*testing.T) {
 		return func(t *testing.T) {
 			f, err := os.Open(file)
 			if err != nil {
@@ -46,7 +69,7 @@ func TestParseFile(t *testing.T) {
 			}
 			defer f.Close()
 
-			actual, err := parseFile(f, ignoreUnexported)
+			actual, err := parseFile(f, re, ignoreUnexported)
 			if err != nil {
 				t.Fatalf("parseFile failed: %v\n", err)
 			}
@@ -72,6 +95,6 @@ func TestParseFile(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		t.Run(c.file, testFn(t, c.file, c.expected, c.ignoreUnexported))
+		t.Run(c.file, testFn(t, c.file, c.expected, c.re, c.ignoreUnexported))
 	}
 }

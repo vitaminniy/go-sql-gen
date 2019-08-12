@@ -36,3 +36,7 @@ func GetMyStructListContext(ctx context.Context, db *sql.DB, query string, args 
 }
 
 ```
+
+### Flag usage
+ + **-i** - ignore private struct fields
+ + **-m** - if you want generate code only for specific struct name(regexp)
